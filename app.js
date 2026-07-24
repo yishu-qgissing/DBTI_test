@@ -131,22 +131,69 @@ const hiddenEnds = {
 
 let step = -1;
 let answers = Array(questions.length).fill(null);
+let secretTimers = [];
 const app = document.querySelector("#app");
 
+function clearSecretTimers(){
+  secretTimers.forEach(id=>{clearTimeout(id);clearInterval(id);});
+  secretTimers=[];
+}
+
 function renderStart(){
+  clearSecretTimers();
   app.innerHTML = `<section class="hero"><div class="eyebrow">DBTI / survival logic inventory</div><h1>你在用什么<br><span>姿势活着？</span></h1><p class="lede">测测你的生存逻辑，最接近中国地下电影《DB》里的谁。</p><div class="warning">别选那个听起来最像好人的。选那个事情真的发生时，你最可能做出来的。<br>世界不负责了解你。这个测试也不一定负责。</div><div class="start-actions"><button class="primary" id="start">开始，看看我是哪种傻逼</button><button class="refuse-link" id="refuse">我不想测</button></div></section>`;
   document.querySelector("#start").onclick=()=>{step=0;renderQuestion();};
   document.querySelector("#refuse").onclick=()=>renderRefusal();
 }
 
 function renderQuestion(){
+  clearSecretTimers();
   const item=questions[step], selected=answers[step];
-  app.innerHTML=`<section class="quiz"><div class="quiz-top"><div class="progress"><i style="width:${((step+1)/questions.length)*100}%"></i></div><div class="counter">${String(step+1).padStart(2,"0")} / ${questions.length}</div></div><article class="question"><div class="question-type">${item.type}</div><h2>${item.q}</h2><div class="answers">${item.a.map((x,i)=>`<button class="answer ${selected===i?"selected":""}" data-i="${i}"><b>${String.fromCharCode(65+i)}</b><span>${x[0]}</span></button>`).join("")}</div></article><div class="quiz-nav"><button class="text-btn" id="back">${step?"← 上一题":"← 返回封面"}</button><span class="meta">NO CORRECT ANSWER</span></div></section>`;
+  app.innerHTML=`<section class="quiz"><div class="quiz-top"><div class="progress"><i style="width:${((step+1)/questions.length)*100}%"></i></div><div class="counter">${String(step+1).padStart(2,"0")} / ${questions.length}</div></div><article class="question"><div class="question-type" id="question-type">${item.type}</div><h2>${item.q}</h2><div class="answers" id="answers">${item.a.map((x,i)=>`<button class="answer ${selected===i?"selected":""}" data-i="${i}"><b>${String.fromCharCode(65+i)}</b><span>${x[0]}</span></button>`).join("")}</div><div id="secret-slot"></div></article><div class="quiz-nav"><button class="text-btn" id="back">${step?"← 上一题":"← 返回封面"}</button><span class="meta" id="quiz-meta">NO CORRECT ANSWER</span></div></section>`;
   document.querySelectorAll(".answer").forEach(btn=>btn.onclick=()=>{
     answers[step]=Number(btn.dataset.i);
     if(step<questions.length-1){step++;renderQuestion();}else{renderResult();}
   });
   document.querySelector("#back").onclick=()=>{if(step===0){step=-1;renderStart();}else{step--;renderQuestion();}};
+
+  // 第10题：题型标签在“家庭”与家庭账本入口之间反复跳变。
+  if(step===9){
+    const typeLabel=document.querySelector("#question-type");
+    let expanded=false;
+    const toggleMother=()=>{
+      expanded=!expanded;
+      typeLabel.textContent=expanded?"家庭：查看这几年到底花了多少钱":"家庭";
+      typeLabel.classList.add("secret-jump");
+      if(expanded) typeLabel.classList.add("secret-ready");
+      setTimeout(()=>typeLabel.classList.remove("secret-jump"),300);
+    };
+    secretTimers.push(setTimeout(toggleMother,1200));
+    secretTimers.push(setInterval(toggleMother,2200));
+    typeLabel.onclick=()=>{
+      if(typeLabel.classList.contains("secret-ready")) renderSecretEnd("M","你没有替他做选择。你只是又替所有人付了一次钱。");
+    };
+  }
+
+  // 第12题：停留六秒后，出现对三个正常答案的拒绝。
+  if(step===11){
+    secretTimers.push(setTimeout(()=>{
+      const slot=document.querySelector("#secret-slot");
+      if(!slot) return;
+      slot.innerHTML=`<button class="secret-answer" id="dream-secret">这些答案都太他妈温和了。</button>`;
+      document.querySelector("#dream-secret").onclick=()=>renderSecretEnd("H","你没有回答问题。你决定重新定义问题。");
+    },6000));
+  }
+
+  // 最后一题：十秒后，界面自己承认它并不相信“后来”。
+  if(step===17){
+    secretTimers.push(setTimeout(()=>{
+      const meta=document.querySelector("#quiz-meta");
+      if(!meta) return;
+      meta.textContent="其实没有后来";
+      meta.classList.add("secret-ready");
+      meta.onclick=()=>renderSecretEnd("X","你已经走到了最后一题，但不再相信“最后”后面还有什么。");
+    },10000));
+  }
 }
 
 function calculate(){
@@ -172,7 +219,7 @@ function calculate(){
     .sort((a,b)=>b.sim-a.sim || roleCodes[a.end[0]].localeCompare(roleCodes[b.end[0]]));
   const candidates=[];
   if(flags.H>=4 && flags.X<5 && profile[0]<2.8 && profile[1]<2.9)candidates.push(["H",flags.H/6]);
-  if(flags.X>=4 && profile[3]>3.2)candidates.push(["X",flags.X/6]);
+  if(flags.X>=3 && profile[3]>3.25)candidates.push(["X",flags.X/5]);
   if(flags.M>=4 && profile[2]<2.6)candidates.push(["M",flags.M/6]);
   if(flags.V>=4 && profile[3]>3.2)candidates.push(["V",flags.V/6]);
   candidates.sort((a,b)=>b[1]-a[1]);
@@ -190,12 +237,19 @@ function card(end,rank,sim,label,showSimilarity=true){
 }
 
 function renderRefusal(){
-  app.innerHTML=`<section class="results"><header class="result-head"><div class="end-label">HIDDEN END / NO TEST TAKEN</div><h1>死婴</h1><div class="subtitle">你拒绝回答，于是测试把沉默当作了唯一证词。</div><div class="stamp">现实之外的可能性</div></header><div class="result-grid">${card(hiddenEnds.V,1,100,"HIDDEN END",false)}</div><div class="result-actions"><button class="primary" id="again">我又想测了</button></div></section>`;
+  renderSecretEnd("V","你拒绝回答，于是测试把沉默当作了唯一证词。","我又想测了");
+}
+
+function renderSecretEnd(key,subtitle,restartLabel="重新活一遍"){
+  clearSecretTimers();
+  const end=hiddenEnds[key];
+  app.innerHTML=`<section class="results"><header class="result-head"><div class="end-label">HIDDEN END / SECRET ROUTE</div><h1>${end[0]}</h1><div class="subtitle">${subtitle}</div><div class="stamp">不是答案把你带到这里的</div></header><div class="result-grid">${card(end,1,100,"HIDDEN END",false)}</div><div class="result-actions"><button class="primary" id="again">${restartLabel}</button></div></section>`;
   document.querySelector("#again").onclick=()=>{answers.fill(null);step=-1;renderStart();};
   window.scrollTo({top:0,behavior:"smooth"});
 }
 
 function renderResult(){
+  clearSecretTimers();
   const r=calculate(); const isHidden=Boolean(r.hidden);
   let cards="";
   if(isHidden){cards+=card(hiddenEnds[r.hidden],1,Math.min(96,Math.max(82,Math.round(82+r.ranked[0].sim/8))),"HIDDEN END");cards+=card(r.ranked[0].end,2,r.ranked[0].sim,"现实投影 01");cards+=card(r.ranked[1].end,3,r.ranked[1].sim,"现实投影 02");}
