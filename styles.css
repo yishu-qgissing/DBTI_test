@@ -140,8 +140,14 @@ button { font: inherit; }
   line-height: 1.65;
   transition: .15s ease;
 }
-.answer:hover, .answer.selected { border-color: var(--red); background: rgba(225,40,27,.09); transform: translateX(5px); }
+.answer.selected { border-color: var(--red); background: rgba(225,40,27,.09); transform: translateX(5px); }
+.answer:active { border-color: var(--red); background: rgba(225,40,27,.09); }
 .answer b { color: var(--red); font-family: Consolas, monospace; }
+
+/* 触摸浏览器会把 :hover 黏在刚点击的位置，导致下一题同位置选项看似被选中。 */
+@media (hover: hover) and (pointer: fine) {
+  .answer:hover { border-color: var(--red); background: rgba(225,40,27,.09); transform: translateX(5px); }
+}
 
 .quiz-nav { margin-top: 26px; display: flex; justify-content: space-between; }
 .text-btn { color: var(--paper-dim); border: 0; background: none; cursor: pointer; padding: 8px 0; }
